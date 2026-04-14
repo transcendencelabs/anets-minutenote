@@ -383,6 +383,104 @@ If the app crashes mid-write, the temp file is left behind (no corrupted final f
 - **Google OAuth credentials** (for calendar integration)
 - **Electron** dependencies (for desktop app packaging)
 
+### PostgreSQL Setup
+
+The backend requires PostgreSQL 14+ for token validation and user management. Here's how to set it up:
+
+#### Installing PostgreSQL
+
+**macOS (Homebrew):**
+```bash
+brew install postgresql@16
+brew services start postgresql@16
+```
+
+**Ubuntu/Debian:**
+```bash
+sudo apt update
+sudo apt install postgresql postgresql-contrib
+sudo systemctl start postgresql
+sudo systemctl enable postgresql
+```
+
+**Windows:**
+1. Download PostgreSQL from [postgresql.org/download/windows](https://www.postgresql.org/download/windows/)
+2. Run the installer — note the superuser password you set for `postgres`
+3. PostgreSQL installs as a Windows service and starts automatically
+
+**Docker (any platform):**
+```bash
+docker run -d \
+  --name meetscribe-postgres \
+  -e POSTGRES_USER=meetscribe \
+  -e POSTGRES_PASSWORD=meetscribe \
+  -e POSTGRES_DB=meetscribe \
+  -p 5432:5432 \
+  postgres:16-alpine
+```
+
+#### Creating the Database and User
+
+After installing PostgreSQL, create a dedicated database and user for MeetScribe:
+
+```bash
+# Connect to PostgreSQL as the superuser (default user is 'postgres')
+# On macOS/Linux with Homebrew, the default user is your system username
+psql -U postgres
+```
+
+Then run these SQL commands:
+
+```sql
+-- Create a dedicated user for MeetScribe
+CREATE USER meetscribe WITH PASSWORD 'meetscribe';
+
+-- Create the database owned by the meetscribe user
+CREATE DATABASE meetscribe OWNER meetscribe;
+
+-- Grant privileges
+GRANT ALL PRIVILEGES ON DATABASE meetscribe TO meetscribe;
+
+-- Connect to the meetscribe database and grant schema privileges
+\c meetscribe
+GRANT ALL PRIVILEGES ON SCHEMA public TO meetscribe;
+```
+
+> **Security note:** Change the default password `meetscribe` to a strong password in production. Update the `DATABASE_URL` in your `.env` file accordingly.
+
+#### Verifying the Connection
+
+Test that MeetScribe can connect to PostgreSQL:
+
+```bash
+psql -U meetscribe -d meetscribe -h localhost -p 5432
+```
+
+If you see the `meetscribe=>` prompt, the connection works. Type `\q` to exit.
+
+#### Database Migrations
+
+MeetScribe automatically runs migrations on startup. The backend creates the required tables (`users` and `tokens`) when it first connects. No manual migration steps are needed.
+
+#### Connection String Format
+
+The `DATABASE_URL` in your `.env` file follows this format:
+
+```
+DATABASE_URL=postgresql://USER:PASSWORD@HOST:PORT/DATABASE
+```
+
+Examples:
+
+| Environment | DATABASE_URL |
+|------------|-------------|
+| Local development (default) | `postgresql://meetscribe:meetscribe@localhost:5432/meetscribe` |
+| Docker | `postgresql://meetscribe:meetscribe@localhost:5432/meetscribe` |
+| Custom password | `postgresql://meetscribe:my_secure_password@localhost:5432/meetscribe` |
+| Remote server | `postgresql://meetscribe:password@db.example.com:5432/meetscribe` |
+
+> **Note:** The backend will log a warning and continue running without a database connection, but token validation and user management endpoints will not work until PostgreSQL is available.
+
 ### Backend Setup
 
 1. **Install all dependencies** from the repository root:
@@ -396,22 +494,24 @@ If the app crashes mid-write, the temp file is left behind (no corrupted final f
    ```
 
 3. **Configure environment variables** in `apps/backend/.env`:
-   - `DATABASE_URL` — PostgreSQL connection string
+   - `DATABASE_URL` — PostgreSQL connection string (see [PostgreSQL Setup](#postgresql-setup) above)
    - `GOOGLE_CLIENT_ID` — From Google Cloud Console
    - `GOOGLE_CLIENT_SECRET` — From Google Cloud Console
    - `GOOGLE_REDIRECT_URI` — Must match OAuth config (e.g., `http://localhost:3456/api/auth/google/callback`)
-   - `TOKEN_VALIDATION_SECRET` — Secret for token hashing
+   - `TOKEN_VALIDATION_SECRET` — Secret for token hashing (generate with `openssl rand -hex 32`)
 
-4. **Create the PostgreSQL database**:
-   ```sql
-   CREATE DATABASE meetscribe;
-   ```
+4. **Ensure PostgreSQL is running** (see [PostgreSQL Setup](#postgresql-setup) above)
 
 5. **Start the backend**:
    ```bash
    npm run dev:backend
    ```
-   The server starts on port 3456 by default.
+   The server starts on port 3456 by default. You should see:
+   ```
+   [INFO] MeetScribe Backend starting... { port: 3456 }
+   [INFO] Database connection established
+   [INFO] MeetScribe Backend listening on port 3456
+   ```
 
 6. **Issue a test token**:
    ```bash
