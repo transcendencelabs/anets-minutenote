@@ -1,0 +1,20 @@
+{
+  "name": "@meetscribe/providers",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --config jest.config.js",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@meetscribe/shared": "*",
+    "@meetscribe/logging": "*",
+    "googleapis": "^140.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

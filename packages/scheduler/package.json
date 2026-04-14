@@ -1,0 +1,21 @@
+{
+  "name": "@meetscribe/scheduler",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "jest --config jest.config.js",
+    "lint": "eslint src"
+  },
+  "dependencies": {
+    "@meetscribe/shared": "*",
+    "@meetscribe/logging": "*",
+    "@meetscribe/storage": "*",
+    "@meetscribe/providers": "*"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0"
+  }
+}

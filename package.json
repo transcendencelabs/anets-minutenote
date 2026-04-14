@@ -1,0 +1,21 @@
+{
+  "name": "meetscribe",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Meeting transcription desktop client",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "dev:desktop": "npm run dev --workspace=@meetscribe/desktop",
+    "dev:backend": "npm run dev --workspace=@meetscribe/backend"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "tslib": "^2.6.0"
+  }
+}

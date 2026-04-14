@@ -1,0 +1,11 @@
+node_modules/
+dist/
+*.db
+*.sqlite
+.env
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+coverage/
+.vite/
