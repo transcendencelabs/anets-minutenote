@@ -7,8 +7,6 @@ import * as path from 'path';
 import { logger } from '@meetscribe/logging';
 import { APP_CONSTANTS } from '@meetscribe/shared';
 import { DatabaseManager } from '@meetscribe/storage';
-import { Scheduler } from '@meetscribe/scheduler';
-import { GoogleCalendarProvider, MockMeetingProvider } from '@meetscribe/providers';
 
 let mainWindow: BrowserWindow | null = null;
 let db: DatabaseManager | null = null;
@@ -47,7 +45,7 @@ function createWindow(): void {
 
 function registerIpcHandlers(): void {
   // Token activation
-  ipcMain.handle('activate-token', async (_event, token: string) => {
+  ipcMain.handle('activate-token', async (_event, _token: string) => {
     logger.info('Token activation requested');
     // TODO: Call backend API to validate token
     return { valid: false, error: 'Not yet connected to backend' };
