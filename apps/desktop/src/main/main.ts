@@ -6,10 +6,19 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import { logger } from '@meetscribe/logging';
 import { APP_CONSTANTS } from '@meetscribe/shared';
-import { DatabaseManager } from '@meetscribe/storage';
+// better-sqlite3 is a native module that must be rebuilt for Electron.
+// If the rebuild hasn't been run, the import will fail at runtime.
+let DatabaseManager: any;
+try {
+  ({ DatabaseManager } = require('@meetscribe/storage'));
+} catch (err) {
+  console.warn('Failed to load @meetscribe/storage (native module). Run: npx @electron/rebuild -w better-sqlite3', err);
+  DatabaseManager = null;
+}
 
 let mainWindow: BrowserWindow | null = null;
-let db: DatabaseManager | null = null;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let db: any | null = null;
 
 function createWindow(): void {
   mainWindow = new BrowserWindow({
@@ -106,11 +115,19 @@ function registerIpcHandlers(): void {
 app.whenReady().then(() => {
   logger.info('MeetScribe Desktop starting...');
 
-  // Initialize local database
-  const dbPath = path.join(app.getPath('userData'), 'meetscribe.db');
-  db = new DatabaseManager(dbPath);
-  db.initialize();
-  logger.info('Local database initialized', { path: dbPath });
+  // Initialize local database (gracefully handle native module failure)
+  if (DatabaseManager) {
+    try {
+      const dbPath = path.join(app.getPath('userData'), 'meetscribe.db');
+      db = new DatabaseManager(dbPath);
+      db.initialize();
+      logger.info('Local database initialized', { path: dbPath });
+    } catch (err) {
+      logger.error('Failed to initialize database', { error: String(err) });
+    }
+  } else {
+    logger.warn('Database module not available. Run: npx @electron/rebuild -w better-sqlite3');
+  }
 
   // Register IPC handlers
   registerIpcHandlers();

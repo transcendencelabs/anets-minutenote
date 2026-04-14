@@ -528,15 +528,41 @@ Examples:
    npm run build
    ```
 
-2. **Start the desktop app**:
+2. **Rebuild native modules for Electron** (required on first setup and after `npm install`):
+   ```bash
+   cd apps/desktop
+   npx @electron/rebuild -w better-sqlite3
+   cd ../..
+   ```
+   > **Note:** This requires Visual Studio C++ Build Tools on Windows. If the rebuild fails, the app will still start but database features will be disabled. See [Native Module Setup](#native-module-setup) below.
+
+3. **Start the Vite dev server** (in one terminal):
+   ```bash
+   npm run dev:renderer
+   ```
+
+4. **Start the Electron app** (in another terminal):
    ```bash
    npm run dev:desktop
    ```
 
-3. **For renderer development with hot reload**:
-   ```bash
-   npm run dev:renderer
-   ```
+   The app loads the renderer from `http://localhost:5173` in development mode.
+
+#### Native Module Setup
+
+The desktop app uses `better-sqlite3`, a native Node.js addon that must be compiled for Electron's Node.js version (not your system Node.js). If you see an error like `NODE_MODULE_VERSION 115 vs 123`, the native module needs rebuilding.
+
+**Prerequisites for rebuilding on Windows:**
+- Install [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the "Desktop development with C++" workload
+- Or install the [windows-build-tools](https://github.com/felixrieseberg/windows-build-tools) package
+
+**Then run:**
+```bash
+cd apps/desktop
+npx @electron/rebuild -w better-sqlite3
+```
+
+If you can't rebuild the native module, the app will still start with a warning and database features will be gracefully disabled until the module is properly rebuilt.
 
 ### Development Mode
 
