@@ -21,4 +21,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getMeetings: () => ipcRenderer.invoke('get-meetings'),
   enableMeeting: (eventId: string) => ipcRenderer.invoke('enable-meeting', eventId),
   disableMeeting: (eventId: string) => ipcRenderer.invoke('disable-meeting', eventId),
+
+  // Google Calendar
+  getGoogleCalendarAuthUrl: () => ipcRenderer.invoke('google-calendar-get-auth-url'),
+  handleGoogleCalendarCallback: (code: string) => ipcRenderer.invoke('google-calendar-callback', code),
+  getCalendarEvents: () => ipcRenderer.invoke('get-calendar-events'),
 });

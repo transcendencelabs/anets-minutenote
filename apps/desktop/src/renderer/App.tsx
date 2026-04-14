@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 
 type AppScreen = 'activation' | 'meetings' | 'settings';
 
+interface CalendarEvent {
+  eventId: string;
+  title: string;
+  description?: string;
+  startTime: string;
+  endTime: string;
+  meetingUrl?: string;
+  platform?: string;
+  transcriptionEnabled?: boolean;
+}
+
 interface AppSettings {
   defaultTranscriptFolder: string;
   autoStartOnLogin: boolean;
@@ -17,30 +28,110 @@ export const App: React.FC = () => {
   const [token, setToken] = useState('');
   const [tokenStatus, setTokenStatus] = useState<'idle' | 'loading' | 'valid' | 'invalid'>('idle');
   const [settings, setSettings] = useState<AppSettings | null>(null);
-  const [meetings, setMeetings] = useState<any[]>([]);
+  const [meetings, setMeetings] = useState<CalendarEvent[]>([]);
+  const [calendarConnected, setCalendarConnected] = useState(false);
+  const [connectingCalendar, setConnectingCalendar] = useState(false);
+  const [calendarStep, setCalendarStep] = useState<'idle' | 'browser-opened' | 'waiting-for-code'>('idle');
+  const [authCode, setAuthCode] = useState('');
+  const [calendarError, setCalendarError] = useState<string | null>(null);
 
   useEffect(() => {
-    const result = (window as any).electron?.getSettings();
+    const result = (window as any).electronAPI?.getSettings();
     if (result) setSettings(result);
   }, []);
 
+  useEffect(() => {
+    if (screen === 'meetings' && calendarConnected) {
+      loadCalendarEvents();
+    }
+  }, [screen, calendarConnected]);
+
   const handleTokenActivation = async () => {
     setTokenStatus('loading');
-    const result = await (window as any).electron.activateToken(token);
-    if (result?.valid) {
-      setTokenStatus('valid');
-      setScreen('meetings');
-    } else {
+    try {
+      const result = await (window as any).electronAPI.activateToken(token);
+      if (result?.valid) {
+        setTokenStatus('valid');
+        setScreen('meetings');
+      } else {
+        setTokenStatus('invalid');
+      }
+    } catch {
       setTokenStatus('invalid');
     }
   };
 
-  const handlePickFolder = async () => {
-    const folder = await (window as any).electron.pickFolder();
-    if (folder && settings) {
-      const updated = await (window as any).electron.updateSettings({ ...settings, defaultTranscriptFolder: folder });
-      setSettings(updated);
+  const handleConnectGoogleCalendar = async () => {
+    setConnectingCalendar(true);
+    setCalendarError(null);
+    setCalendarStep('browser-opened');
+    try {
+      const result = await (window as any).electronAPI.getGoogleCalendarAuthUrl();
+      if (result.error) {
+        setCalendarError(result.error);
+        setConnectingCalendar(false);
+        setCalendarStep('idle');
+        return;
+      }
+      // Auth URL was opened in browser, stop connecting state so input is active
+      setConnectingCalendar(false);
+      setCalendarStep('waiting-for-code');
+    } catch (err) {
+      setCalendarError('Failed to start Google Calendar connection');
+      setConnectingCalendar(false);
+      setCalendarStep('idle');
     }
+  };
+
+  const handleAuthCodeSubmit = async () => {
+    if (!authCode.trim()) return;
+    setConnectingCalendar(true);
+    try {
+      const result = await (window as any).electronAPI.handleGoogleCalendarCallback(authCode.trim());
+      if (result.success) {
+        setCalendarConnected(true);
+        setCalendarStep('idle');
+        setAuthCode('');
+        await loadCalendarEvents();
+      } else {
+        setCalendarError(result.error || 'Authentication failed');
+      }
+    } catch (err) {
+      setCalendarError('Failed to complete authentication');
+    }
+    setConnectingCalendar(false);
+  };
+
+  const loadCalendarEvents = async () => {
+    try {
+      const result = await (window as any).electronAPI.getCalendarEvents();
+      if (result.events) {
+        setMeetings(result.events);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const handlePickFolder = async () => {
+    try {
+      const folder = await (window as any).electronAPI.pickFolder();
+      if (folder && settings) {
+        const updated = await (window as any).electronAPI.updateSettings({ ...settings, defaultTranscriptFolder: folder });
+        setSettings(updated);
+      }
+    } catch {
+      // ignore
+    }
+  };
+
+  const toggleMeetingTranscription = (eventId: string) => {
+    if (calendarConnected) {
+      (window as any).electronAPI.enableMeeting(eventId);
+    }
+    setMeetings(meetings.map(m =>
+      m.eventId === eventId ? { ...m, transcriptionEnabled: !m.transcriptionEnabled } : m
+    ));
   };
 
   if (screen === 'activation') {
@@ -58,6 +149,9 @@ export const App: React.FC = () => {
             {tokenStatus === 'loading' ? 'Validating...' : 'Activate'}
           </button>
           {tokenStatus === 'invalid' && <p style={{ color: 'red', marginTop: 8 }}>Invalid token. Please check and try again.</p>}
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <button onClick={() => setScreen('meetings')} style={{ padding: '8px 24px', background: '#e0e0e0', border: 'none', borderRadius: 4 }}>Skip (Dev Mode)</button>
         </div>
       </div>
     );
@@ -92,15 +186,56 @@ export const App: React.FC = () => {
     <div style={{ maxWidth: 800, margin: '40px auto', padding: 24, fontFamily: 'system-ui, sans-serif' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
         <h1>MeetScribe</h1>
-        <button onClick={() => setScreen('settings')}>Settings</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          {!calendarConnected && (
+            <button onClick={handleConnectGoogleCalendar} disabled={connectingCalendar && calendarStep === 'browser-opened'} style={{ padding: '8px 16px' }}>
+              {connectingCalendar ? 'Connecting...' : 'Connect Google Calendar'}
+            </button>
+          )}
+          {calendarConnected && <span style={{ padding: '8px 16px', color: '#4caf50' }}>✓ Calendar Connected</span>}
+          <button onClick={() => setScreen('settings')}>Settings</button>
+        </div>
       </div>
-      {meetings.length === 0 ? (
+      {calendarError && <p style={{ color: 'red', padding: 8, background: '#ffebee', borderRadius: 4 }}>{calendarError}</p>}
+      {!calendarConnected ? (
+        <div style={{ textAlign: 'center', padding: 48 }}>
+          {calendarStep === 'idle' && (
+            <>
+              <p style={{ color: '#666', marginBottom: 24 }}>Connect your Google Calendar to see meetings with meeting links.</p>
+              <button onClick={handleConnectGoogleCalendar} disabled={connectingCalendar} style={{ padding: '12px 24px', fontSize: 16 }}>
+                {connectingCalendar ? 'Connecting...' : 'Connect Google Calendar'}
+              </button>
+            </>
+          )}
+          {calendarStep === 'browser-opened' && (
+            <p style={{ color: '#666' }}>Opening Google authorization page in your browser...</p>
+          )}
+          {calendarStep === 'waiting-for-code' && (
+            <div style={{ maxWidth: 500, margin: '0 auto' }}>
+              <p style={{ color: '#666', marginBottom: 16 }}>Open your browser and authorize MeetScribe with Google. After authorization, you'll be redirected to a URL (e.g. http://localhost:3456/api/auth/google/callback?code=...). <strong>Paste the entire URL below</strong> and the app will extract the authorization code automatically.</p>
+              <input
+                id="authCodeInput"
+                type="text"
+                value={authCode}
+                onChange={(e) => setAuthCode(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleAuthCodeSubmit(); }}
+                placeholder="Paste the full redirect URL here"
+                disabled={connectingCalendar}
+                autoFocus
+                style={{ width: '100%', padding: 8, marginBottom: 12, boxSizing: 'border-box', border: '1px solid #ccc', borderRadius: 4 }}
+              />
+              <button onClick={handleAuthCodeSubmit} disabled={connectingCalendar || !authCode.trim()} style={{ padding: '8px 24px', cursor: 'pointer' }}>
+                {connectingCalendar ? 'Authenticating...' : 'Submit Code'}
+              </button>
+            </div>
+          )}
+        </div>
+      ) : meetings.length === 0 ? (
         <div style={{ textAlign: 'center', padding: 48, color: '#666' }}>
           <p>No upcoming meetings found.</p>
-          <p>Connect your Google Calendar to see meetings with meeting links.</p>
         </div>
       ) : (
-        meetings.map((m: any) => (
+        meetings.map((m) => (
           <div key={m.eventId} style={{ border: '1px solid #ddd', borderRadius: 8, padding: 16, marginBottom: 12, display: 'flex', justifyContent: 'space-between' }}>
             <div>
               <h3 style={{ margin: '0 0 4px' }}>{m.title}</h3>
@@ -108,8 +243,13 @@ export const App: React.FC = () => {
               <p style={{ margin: '4px 0 0', fontSize: 12, color: '#999' }}>{m.platform}</p>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-              <label style={{ fontSize: 14 }}><input type="checkbox" checked={m.transcriptionEnabled ?? false} style={{ marginRight: 4 }} />Transcribe</label>
-              <span style={{ fontSize: 12, color: '#999' }}>{m.status}</span>
+              <label style={{ fontSize: 14 }}>
+                <input type="checkbox" checked={m.transcriptionEnabled ?? false} onChange={() => toggleMeetingTranscription(m.eventId)} style={{ marginRight: 4 }} />
+                Transcribe
+              </label>
+              <span style={{ fontSize: 12, color: '#999' }}>
+                <a href={m.meetingUrl} target="_blank" rel="noreferrer">Join Meeting</a>
+              </span>
             </div>
           </div>
         ))

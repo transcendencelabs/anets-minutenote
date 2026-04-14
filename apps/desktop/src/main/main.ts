@@ -6,6 +6,14 @@ import { app, BrowserWindow, ipcMain, dialog } from 'electron';
 import * as path from 'path';
 import { logger } from '@meetscribe/logging';
 import { APP_CONSTANTS } from '@meetscribe/shared';
+
+// Load env from backend config
+import dotenv from 'dotenv';
+// Compiled output is at dist/main/main.js, so __dirname resolves to apps/desktop/dist/main
+// We need to go up 3 directories to reach the project root, then into apps/backend
+const envFilePath = path.join(__dirname, '../../../../apps/backend/.env');
+logger.info('Loading .env from', { path: envFilePath });
+dotenv.config({ path: envFilePath });
 // better-sqlite3 is a native module that must be rebuilt for Electron.
 // If the rebuild hasn't been run, the import will fail at runtime.
 let DatabaseManager: any;
@@ -34,14 +42,8 @@ function createWindow(): void {
     },
   });
 
-  // In development, load from Vite dev server
-  const isDev = process.env.NODE_ENV === 'development';
-  if (isDev) {
-    mainWindow.loadURL('http://localhost:5173');
-    mainWindow.webContents.openDevTools();
-  } else {
-    mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
-  }
+  // Load built renderer files
+  mainWindow.loadFile(path.join(__dirname, '../renderer/index.html'));
 
   mainWindow.on('closed', () => {
     mainWindow = null;
@@ -105,6 +107,92 @@ function registerIpcHandlers(): void {
     const user = db.getUserById('default');
     if (!user) return null;
     return db.setMeetingPreference(user.id, eventId, false);
+  });
+
+  // Google Calendar OAuth (opens browser window for authorization)
+  ipcMain.handle('google-calendar-get-auth-url', async () => {
+    logger.info('Google Calendar auth URL requested');
+    try {
+      const { GoogleCalendarProvider } = require('@meetscribe/providers');
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3456/api/auth/google/callback';
+      if (!clientId || !clientSecret) {
+        return { error: 'Google OAuth credentials not configured (GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)' };
+      }
+      const provider = new GoogleCalendarProvider({ clientId, clientSecret, redirectUri });
+      const authUrl = provider.getAuthUrl();
+      
+      // Open OAuth window in Electron's shell (opens in default browser)
+      const { shell } = require('electron');
+      shell.openExternal(authUrl);
+      
+      return { success: true, message: 'Please complete authorization in your browser. For development, paste the authorization code from the browser URL after login.' };
+    } catch (err) {
+      return { error: String(err) };
+    }
+  });
+
+  ipcMain.handle('google-calendar-callback', async (_event, codeOrUrl: string) => {
+    logger.info('Google Calendar OAuth callback received');
+    try {
+      const { GoogleCalendarProvider } = require('@meetscribe/providers');
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3456/api/auth/google/callback';
+      const provider = new GoogleCalendarProvider({ clientId, clientSecret, redirectUri });
+
+      // Extract code from URL if a full URL was pasted
+      let code = codeOrUrl;
+      try {
+        const url = new URL(codeOrUrl);
+        const urlCode = url.searchParams.get('code');
+        if (urlCode) {
+          code = urlCode;
+          logger.info('Extracted authorization code from URL');
+        }
+        // Also check for error parameters
+        const authError = url.searchParams.get('authError');
+        if (authError) {
+          const errorMsg = decodeURIComponent(authError);
+          return { error: `Google OAuth error: ${errorMsg}` };
+        }
+      } catch {
+        // Not a valid URL, treat as raw code
+      }
+
+      await provider.handleAuthCallback(code);
+      await provider.connect();
+      // Store connection in DB
+      let user = db.getUserById('default');
+      if (!user) {
+        user = db.createUser('default@example.com');
+      }
+      const connections = db.getCalendarConnectionsByUserId(user.id);
+      if (connections.length > 0) {
+        db.updateCalendarConnectionOAuth(connections[0].id, 'connected', 'stored', ['https://www.googleapis.com/auth/calendar.readonly']);
+      } else {
+        db.createCalendarConnection(user.id, 'google', 'connected', 'stored', ['https://www.googleapis.com/auth/calendar.readonly']);
+      }
+      return { success: true };
+    } catch (err) {
+      return { error: String(err) };
+    }
+  });
+
+  ipcMain.handle('get-calendar-events', async () => {
+    try {
+      const { GoogleCalendarProvider } = require('@meetscribe/providers');
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3456/api/auth/google/callback';
+      const provider = new GoogleCalendarProvider({ clientId, clientSecret, redirectUri });
+      // TODO: Load stored refresh token and use it
+      await provider.connect();
+      return { events: await provider.listUpcomingMeetings() };
+    } catch (err) {
+      return { error: String(err), events: [] };
+    }
   });
 }
 
