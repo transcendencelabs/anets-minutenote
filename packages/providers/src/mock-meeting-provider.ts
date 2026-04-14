@@ -17,7 +17,7 @@ export class MockMeetingProvider implements MeetingProvider {
   private ended = false;
   private participants: MeetingParticipant[] = [];
 
-  async canHandle(url: string): boolean {
+  canHandle(_url: string): boolean {
     // Mock provider handles all URLs for testing
     return true;
   }

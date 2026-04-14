@@ -21,11 +21,9 @@ import type { MeetingProvider, MeetingParticipant, AudioStreamInfo } from './mee
 export class GoogleMeetProvider implements MeetingProvider {
   public readonly platform: MeetingPlatform = 'google_meet';
   private currentUrl: string | undefined;
-  private page: any = null; // Playwright Page - typed as any to avoid hard dep
-  private browser: any = null; // Playwright Browser
   private ended = false;
 
-  async canHandle(url: string): boolean {
+  canHandle(url: string): boolean {
     return url.includes('meet.google.com');
   }
 

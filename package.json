@@ -15,7 +15,8 @@
     "dev:backend": "npm run dev --workspace=@meetscribe/backend"
   },
   "devDependencies": {
-    "typescript": "^5.4.0",
-    "tslib": "^2.6.0"
+    "@types/node": "^25.6.0",
+    "tslib": "^2.6.0",
+    "typescript": "^5.4.0"
   }
 }

@@ -24,7 +24,7 @@ export class MockTranscriptionProvider implements TranscriptionProvider {
     return sessionId;
   }
 
-  async transcribeChunk(sessionId: string, audioChunk: Buffer): Promise<TranscriptionResult[]> {
+  async transcribeChunk(sessionId: string, _audioChunk: Buffer): Promise<TranscriptionResult[]> {
     const session = this.activeSessions.get(sessionId);
     if (!session) {
       throw new Error(`No active session with ID: ${sessionId}`);

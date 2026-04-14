@@ -98,7 +98,7 @@ export class Scheduler {
     }
 
     // Cancel all active runs
-    for (const [runId, context] of this.activeRuns) {
+    for (const [runId, _context] of this.activeRuns) {
       try {
         await this.cancelRun(runId, 'Scheduler shutting down');
       } catch (error) {
@@ -351,7 +351,7 @@ export class Scheduler {
   /** Complete a meeting run */
   private async completeRun(
     context: MeetingRunContext,
-    targetState: MeetingLifecycleState = 'ending',
+    _targetState: MeetingLifecycleState = 'ending',
     reason: string = 'Meeting completed'
   ): Promise<void> {
     try {

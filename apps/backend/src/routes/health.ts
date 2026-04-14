@@ -3,7 +3,6 @@
 // ============================================================================
 
 import { Router } from 'express';
-import { logger } from '@meetscribe/logging';
 
 export const healthRoutes = Router();
 

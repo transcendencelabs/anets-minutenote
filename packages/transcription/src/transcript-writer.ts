@@ -4,11 +4,7 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import type {
-  TranscriptOutput,
-  TranscriptSegmentRow,
-  SpeakerConfidence,
-} from '@meetscribe/shared';
+import type { TranscriptOutput } from '@meetscribe/shared';
 import { TRANSCRIPT_CONSTANTS } from '@meetscribe/shared';
 import { logger } from '@meetscribe/logging';
 

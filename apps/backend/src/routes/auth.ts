@@ -6,7 +6,7 @@ import { Router, Request, Response } from 'express';
 import { Pool } from 'pg';
 import { logger } from '@meetscribe/logging';
 
-export function authRoutes(pool: Pool): Router {
+export function authRoutes(_pool: Pool): Router {
   const router = Router();
 
   /** GET /api/auth/google/url - Returns Google OAuth authorization URL */

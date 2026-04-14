@@ -3,7 +3,6 @@
 // ============================================================================
 
 import type { MeetingLifecycleState } from '@meetscribe/shared';
-import { MEETING_LIFECYCLE_STATES } from '@meetscribe/shared';
 import { logger } from '@meetscribe/logging';
 
 /**

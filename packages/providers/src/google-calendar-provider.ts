@@ -7,7 +7,7 @@ import { OAuth2Client } from 'google-auth-library';
 import type { CalendarEvent, CalendarProviderType } from '@meetscribe/shared';
 import { inferMeetingPlatform, TIMEOUTS } from '@meetscribe/shared';
 import { logger } from '@meetscribe/logging';
-import type { CalendarProvider, CalendarProviderConfig } from './calendar-provider';
+import type { CalendarProvider } from './calendar-provider';
 
 export interface GoogleCalendarConfig {
   clientId: string;
@@ -22,7 +22,7 @@ export class GoogleCalendarProvider implements CalendarProvider {
   private calendar: ReturnType<typeof google.calendar> | null = null;
   private connected = false;
 
-  constructor(private config: GoogleCalendarConfig) {
+  constructor(config: GoogleCalendarConfig) {
     this.oauth2Client = new OAuth2Client(
       config.clientId,
       config.clientSecret,
